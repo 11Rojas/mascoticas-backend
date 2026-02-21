@@ -1,2 +1,8 @@
 # deps
 node_modules/
+
+# environment variables (NEVER commit these)
+.env
+.env.local
+.env.*.local
+*.env
