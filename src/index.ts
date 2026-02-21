@@ -13,9 +13,31 @@ const onlineUsers = new Map<any, string>(); // ws.raw -> userId
 
 const app = new Hono()
 
-//Cors
+// ── CORS ────────────────────────────────────────────────────────────────────
+// Always allow localhost for local dev.
+// Set ALLOWED_ORIGIN in .env.local (or server env) for staging/production.
+// Example: ALLOWED_ORIGIN=https://mascoticas.app
+const devOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+];
+const prodOrigins = [
+  'https://mascoticas.app',
+  'https://www.mascoticas.app',
+];
+const envOrigin = process.env.ALLOWED_ORIGIN;
+const allowedOrigins = Array.from(new Set([
+  ...devOrigins,
+  ...prodOrigins,
+  ...(envOrigin ? [envOrigin] : []),
+]));
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  origin: (origin) => {
+    // Allow requests with no Origin header (curl, server-to-server, Postman)
+    if (!origin) return '';
+    return allowedOrigins.includes(origin) ? origin : '';
+  },
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'x-better-auth-origin'],
