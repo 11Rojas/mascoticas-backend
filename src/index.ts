@@ -20,6 +20,7 @@ const app = new Hono()
 const devOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:3000',
+  'https://mascoticas.app'
 ];
 const prodOrigins = [
   'https://mascoticas.app',

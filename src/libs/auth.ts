@@ -30,5 +30,5 @@ export const auth = betterAuth({
             clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
         }
     },
-    trustedOrigins: ['http://localhost:3000', 'http://127.0.0.1:3000']
+    trustedOrigins: ['http://localhost:3000', 'http://127.0.0.1:3000', "https://mascoticas.app"]
 });
