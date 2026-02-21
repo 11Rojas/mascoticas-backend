@@ -5,13 +5,20 @@ import { MongoClient } from "mongodb";
 const client = new MongoClient(process.env.MONGODB_URI || "mongodb://localhost:27017/mascoticas");
 const db = client.db();
 
+// Ensure the URL always has a protocol (guards against BETTER_AUTH_URL=api.mascoticas.app)
+function ensureProtocol(url: string | undefined, fallback: string): string {
+    if (!url) return fallback;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return `https://${url}`;
+}
+
 export const auth = betterAuth({
     database: mongodbAdapter(db, {
         usePlural: true
 
     }),
     secret: process.env.BETTER_AUTH_SECRET,
-    baseURL: process.env.BETTER_AUTH_URL,
+    baseURL: ensureProtocol(process.env.BETTER_AUTH_URL, 'http://localhost:3001'),
     user: {
         fields: {
             image: "profile_picture",
