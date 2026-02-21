@@ -14,34 +14,25 @@ const onlineUsers = new Map<any, string>(); // ws.raw -> userId
 const app = new Hono()
 
 // ── CORS ────────────────────────────────────────────────────────────────────
-// Always allow localhost for local dev.
-// Set ALLOWED_ORIGIN in .env.local (or server env) for staging/production.
-// Example: ALLOWED_ORIGIN=https://mascoticas.app
-const devOrigins = [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'https://mascoticas.app'
-];
-const prodOrigins = [
-  'https://mascoticas.app',
-  'https://www.mascoticas.app',
-];
 const envOrigin = process.env.ALLOWED_ORIGIN;
 const allowedOrigins = Array.from(new Set([
-  ...devOrigins,
-  ...prodOrigins,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'https://mascoticas.app',
+  'https://www.mascoticas.app',
   ...(envOrigin ? [envOrigin] : []),
 ]));
 
 app.use(cors({
+  // Return the matched origin (required for credentials) or null to reject
   origin: (origin) => {
-    // Allow requests with no Origin header (curl, server-to-server, Postman)
-    if (!origin) return '';
-    return allowedOrigins.includes(origin) ? origin : '';
+    if (!origin) return origin;                              // server-to-server / Postman
+    return allowedOrigins.includes(origin) ? origin : null; // null = rejected
   },
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'x-better-auth-origin'],
+  allowHeaders: ['Content-Type', 'Authorization', 'x-better-auth-origin', 'Cookie'],
+  exposeHeaders: ['Set-Cookie'],
 }));
 
 

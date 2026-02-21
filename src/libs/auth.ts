@@ -8,7 +8,7 @@ const db = client.db();
 export const auth = betterAuth({
     database: mongodbAdapter(db, {
         usePlural: true
-        
+
     }),
     secret: process.env.BETTER_AUTH_SECRET,
     baseURL: process.env.BETTER_AUTH_URL,
@@ -30,5 +30,11 @@ export const auth = betterAuth({
             clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
         }
     },
-    trustedOrigins: ['http://localhost:3000', 'http://127.0.0.1:3000', "https://mascoticas.app"]
+    trustedOrigins: [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'https://mascoticas.app',
+        'https://www.mascoticas.app',
+        ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
+    ]
 });
