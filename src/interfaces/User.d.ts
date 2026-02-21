@@ -5,12 +5,45 @@ export enum UserBadges {
     GOLD = 'GOLD',
     SILVER = 'SILVER',
     BRONZE = 'BRONZE',
+    MIEMBRO_NUEVO = 'MIEMBRO_NUEVO',
 }
 
 export enum UserStatus {
     ACTIVE = 'active',
     INACTIVE = 'inactive',
     BANNED = 'banned',
+}
+
+export enum UserPlan {
+    FREE = 'free',
+    GOLD = 'gold',
+    PLATINUM = 'platinum',
+}
+
+export interface IPaymentMethod {
+    type: 'pago_movil' | 'zelle' | 'transferencia';
+    label: string;       // e.g. "Mi Banco Plaza"
+    phone?: string;
+    bank?: string;
+    rif?: string;
+    email?: string;      // for Zelle
+    accountNumber?: string;
+    isDefault: boolean;
+}
+
+export interface IUserPreferences {
+    notifications: {
+        matches: boolean;
+        messages: boolean;
+        adoptions: boolean;
+        promotions: boolean;
+    };
+    privacy: {
+        showLocation: boolean;
+        showPhone: boolean;
+    };
+    language: 'es' | 'en';
+    theme: 'light' | 'dark' | 'system';
 }
 
 /** Base interface for User data */
@@ -27,10 +60,14 @@ export interface IUser {
         }
     };
     profile_picture: string;
-    pets: Types.ObjectId[]; // References to Pet model
+    pets: Types.ObjectId[];
     is_verified: boolean;
     status: UserStatus;
     badges: UserBadges[];
+    plan: UserPlan;
+    paymentMethods: IPaymentMethod[];
+    preferences: IUserPreferences;
+    pushSubscriptions: any[];
 }
 
 /** Mongoose Document for User */
@@ -39,4 +76,3 @@ export interface UserDocument extends IUser, Document {
     createdAt: Date;
     updatedAt: Date;
 }
-

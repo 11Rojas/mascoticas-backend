@@ -6,7 +6,10 @@ const chatSchema = new Schema<ChatDocument>({
     match_id: { type: Schema.Types.ObjectId, ref: "Match", required: true },
     messages: [{ type: Schema.Types.ObjectId, ref: "Message" }],
     last_message: { type: String, default: "" },
-    last_message_date: { type: Date, default: Date.now }
+    last_message_date: { type: Date, default: Date.now },
+    muted_by: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    deleted_by: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    read_by: [{ type: Schema.Types.ObjectId, ref: "User" }]
 }, {
     timestamps: true
 });
