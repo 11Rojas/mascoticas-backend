@@ -22,9 +22,12 @@ const preferencesSchema = new Schema({
     privacy: {
         showLocation: { type: Boolean, default: true },
         showPhone: { type: Boolean, default: false },
+        showOnlineStatus: { type: Boolean, default: true },
+        showReadReceipts: { type: Boolean, default: true },
     },
     language: { type: String, enum: ['es', 'en'], default: 'es' },
     theme: { type: String, enum: ['light', 'dark', 'system'], default: 'system' },
+    distanceUnit: { type: String, enum: ['km', 'miles'], default: 'km' },
 }, { _id: false });
 
 const userSchema = new Schema<UserDocument>({

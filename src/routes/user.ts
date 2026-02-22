@@ -235,8 +235,7 @@ userRouter.get('/pets/:id/match-candidates', async (c) => {
         // 2. Query other pets - EXTREMELY PERMISSIVE FOR DEBUGGING
         const query: any = {
             owner_id: { $ne: user._id },
-            _id: { $ne: activePetId }, // Not me
-            _id: { $nin: swipedPetIds } // Not swiped
+            _id: { $ne: activePetId, $nin: swipedPetIds }
         };
 
         console.log(`DEBUG: Finding match candidates. USER: ${user._id}, PET: ${activePetId}`);
@@ -487,15 +486,17 @@ userRouter.patch('/preferences', async (c) => {
             });
         }
         if (body.privacy) {
-            if (typeof body.privacy.showLocation === 'boolean')
-                update['preferences.privacy.showLocation'] = body.privacy.showLocation;
-            if (typeof body.privacy.showPhone === 'boolean')
-                update['preferences.privacy.showPhone'] = body.privacy.showPhone;
+            ['showLocation', 'showPhone', 'showOnlineStatus', 'showReadReceipts'].forEach(f => {
+                if (typeof body.privacy[f] === 'boolean')
+                    update[`preferences.privacy.${f}`] = body.privacy[f];
+            });
         }
         if (body.language && ['es', 'en'].includes(body.language))
             update['preferences.language'] = body.language;
         if (body.theme && ['light', 'dark', 'system'].includes(body.theme))
             update['preferences.theme'] = body.theme;
+        if (body.distanceUnit && ['km', 'miles'].includes(body.distanceUnit))
+            update['preferences.distanceUnit'] = body.distanceUnit;
         const user = await User.findOneAndUpdate(
             { email: session.user.email },
             { $set: update },
@@ -844,6 +845,21 @@ userRouter.post('/users/:id/block', async (c) => {
 
         await user.save();
         return c.json({ success: true, blocked: !isBlocked });
+    } catch (error) {
+        return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+});
+
+// GET /blocked-users - Get list of blocked users
+userRouter.get('/blocked-users', async (c) => {
+    try {
+        const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
+        if (!session) return c.json({ error: 'No autorizado' }, 401);
+
+        const user = await User.findOne({ email: session.user.email }).populate('blockedUsers', 'name profile_picture');
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        return c.json({ success: true, blockedUsers: user.blockedUsers });
     } catch (error) {
         return c.json({ error: 'Error interno del servidor' }, 500);
     }
