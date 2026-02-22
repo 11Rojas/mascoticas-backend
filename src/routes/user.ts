@@ -53,7 +53,7 @@ const sendPush = async (userId: any, title: string, message: string, url: string
 
     const recipient = await User.findById(userId);
     if (recipient && recipient.pushSubscriptions && recipient.pushSubscriptions.length > 0) {
-        const payload = JSON.stringify({ title, message, url });
+        const payload = JSON.stringify({ title, message, url, chatId });
         const subscriptions = recipient.pushSubscriptions;
 
         const pushPromises = subscriptions.map((sub, idx) =>
@@ -613,6 +613,46 @@ userRouter.get('/matches', async (c) => {
     }
 });
 
+// GET /matches/pending - Swipes recibidos de tipo 'like' que el usuario aún no ha devuelto (pending matches)
+userRouter.get('/matches/pending', async (c) => {
+    try {
+        const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
+        if (!session) return c.json({ error: 'No autorizado' }, 401);
+
+        const user = await User.findOne({ email: session.user.email });
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        // Mascotas del usuario
+        const myPetIds = user.pets.map((id: any) => id.toString());
+
+        // Swipes recibidos (alguien le dio like a una de mis mascotas)
+        const receivedLikes = await Swipe.find({
+            swiped_pet: { $in: myPetIds },
+            type: 'like'
+        }).populate({ path: 'swiper_pet', select: 'name images owner_id race species' });
+
+        // IDs de mascotas que yo ya swipeé (en cualquier dirección)
+        const mySwipedIds = await Swipe.find({
+            swiper_pet: { $in: myPetIds }
+        }).distinct('swiped_pet');
+        const mySwipedSet = new Set(mySwipedIds.map((id: any) => id.toString()));
+
+        // Filtrar los que yo aún NO he swipeado de vuelta
+        const pending = receivedLikes.filter(s => !mySwipedSet.has(s.swiper_pet?._id?.toString()));
+
+        const result = pending.map(s => ({
+            swipeId: s._id,
+            fromPet: s.swiper_pet,
+            toPetId: s.swiped_pet
+        }));
+
+        return c.json({ success: true, matches: result });
+    } catch (error) {
+        console.error('Error fetching pending matches:', error);
+        return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+});
+
 // GET /chats - List all active chats
 userRouter.get('/chats', async (c) => {
     try {
@@ -698,7 +738,7 @@ userRouter.post('/chats/:id/messages', async (c) => {
                     recipientId,
                     `Mensaje de ${user?.name || 'Mascoticas'}`,
                     content.length > 50 ? content.substring(0, 47) + '...' : content,
-                    `/dashboard/chats`,
+                    `/dashboard`,
                     chatId
                 );
 
