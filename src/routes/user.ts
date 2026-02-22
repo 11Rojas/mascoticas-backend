@@ -436,6 +436,76 @@ userRouter.patch('/pets/:id/lost-status', async (c) => {
     }
 });
 
+// GET /pets-list/lost - Public list of lost pets
+userRouter.get('/pets-list/lost', async (c) => {
+    try {
+        const pets = await Pet.find({ is_lost: true })
+            .populate('owner_id', 'name phone profile_picture location')
+            .sort({ updatedAt: -1 });
+        return c.json({ success: true, pets });
+    } catch (error) {
+        return c.json({ error: 'Error fetching lost pets' }, 500);
+    }
+});
+
+// GET /pets-list/adoption - Public list of pets in adoption
+userRouter.get('/pets-list/adoption', async (c) => {
+    try {
+        const pets = await Pet.find({ in_adoption: true })
+            .populate('owner_id', 'name phone profile_picture location')
+            .sort({ updatedAt: -1 });
+        return c.json({ success: true, pets });
+    } catch (error) {
+        return c.json({ error: 'Error fetching adoption pets' }, 500);
+    }
+});
+
+// POST /reports - Create a report for a lost/adoption animal
+userRouter.post('/reports', async (c) => {
+    try {
+        const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
+        if (!session) return c.json({ error: 'No autorizado' }, 401);
+
+        const user = await User.findOne({ email: session.user.email });
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        const { type, animalInfo, lostDetails, adoptionDetails, contact } = await c.req.json();
+
+        // Create a new Pet record for this report
+        const newPetData: any = {
+            owner_id: user._id,
+            name: animalInfo?.name || "Sin nombre",
+            species: animalInfo?.species || "Otro",
+            race: animalInfo?.race || "Desconocida",
+            age: parseInt(animalInfo?.age) || 0,
+            gender: "Desconocido",
+            weight: 0,
+            images: animalInfo?.imageUrl ? [animalInfo.imageUrl] : [],
+        };
+
+        if (type === 'lost') {
+            newPetData.is_lost = true;
+            newPetData.lostInfo = { ...lostDetails, contact };
+            newPetData.description = lostDetails?.description || "";
+        } else {
+            newPetData.in_adoption = true;
+            newPetData.adoptionInfo = { ...adoptionDetails, contact };
+            newPetData.description = adoptionDetails?.description || "";
+        }
+
+        const newPet = new Pet(newPetData);
+        await newPet.save();
+
+        user.pets.push(newPet._id as any);
+        await user.save();
+
+        return c.json({ success: true, pet: newPet });
+    } catch (error) {
+        console.error('Error creating report:', error);
+        return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+});
+
 
 // ── GET /me ──────────────────────────────────────────────────────
 userRouter.get('/me', async (c) => {
