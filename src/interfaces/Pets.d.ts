@@ -22,6 +22,9 @@ export interface ILostInfo {
     contact?: string;
     description?: string;
     found?: boolean;
+    foundBy?: Types.ObjectId | string; // User ID or external name
+    resolutionDetails?: string;
+    foundDate?: Date;
 }
 
 export interface IPets {

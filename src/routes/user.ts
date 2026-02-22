@@ -448,6 +448,23 @@ userRouter.get('/pets-list/lost', async (c) => {
     }
 });
 
+userRouter.get('/users/search-username', async (c) => {
+    try {
+        const q = c.req.query('q') || '';
+        if (q.length < 3) return c.json({ success: true, users: [] });
+
+        const users = await User.find({
+            username: { $regex: q, $options: 'i' }
+        })
+            .select('name username profile_picture')
+            .limit(5);
+
+        return c.json({ success: true, users });
+    } catch (error) {
+        return c.json({ error: 'Error al buscar usuarios' }, 500);
+    }
+});
+
 // GET /pets-list/adoption - Public list of pets in adoption
 userRouter.get('/pets-list/adoption', async (c) => {
     try {
@@ -490,7 +507,7 @@ userRouter.post('/reports', async (c) => {
             race: animalInfo?.race || "Desconocida",
             age: parseInt(animalInfo?.age) || 0,
             gender: "Desconocido",
-            weight: 0,
+            weight: parseFloat(animalInfo?.weight) || 0,
             images: animalInfo?.imageUrl ? [animalInfo.imageUrl] : [],
         };
 
@@ -514,6 +531,50 @@ userRouter.post('/reports', async (c) => {
     } catch (error) {
         console.error('Error creating report:', error);
         return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+});
+
+userRouter.patch('/pets/:id/found', async (c) => {
+    try {
+        const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
+        if (!session) return c.json({ error: 'No autorizado' }, 401);
+
+        const { id } = c.req.param();
+        const { foundBy, resolutionDetails } = await c.req.json();
+
+        // Check if pet belongs to session user
+        const user = await User.findOne({ email: session.user.email });
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        const pet = await Pet.findById(id);
+        if (!pet) return c.json({ error: 'Mascota no encontrada' }, 404);
+
+        if (pet.owner_id.toString() !== user._id.toString()) {
+            return c.json({ error: 'No tienes permiso para actualizar esta mascota' }, 403);
+        }
+
+        // Update pet status
+        const updateDoc: any = {
+            is_lost: false,
+            in_adoption: false,
+        };
+
+        if (pet.lostInfo) {
+            updateDoc.lostInfo = {
+                ...pet.lostInfo,
+                found: true,
+                foundBy,
+                resolutionDetails,
+                foundDate: new Date()
+            };
+        }
+
+        const updatedPet = await Pet.findByIdAndUpdate(id, { $set: updateDoc }, { new: true });
+
+        return c.json({ success: true, pet: updatedPet });
+    } catch (error) {
+        console.error('Error reporting found pet:', error);
+        return c.json({ error: 'Error al reportar mascota encontrada' }, 500);
     }
 });
 

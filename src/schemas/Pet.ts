@@ -33,6 +33,9 @@ const lostInfoSchema = new Schema({
     contact: { type: String },
     description: { type: String },
     found: { type: Boolean, default: false },
+    foundBy: { type: Schema.Types.Mixed, default: null }, // ObjectId or String
+    resolutionDetails: { type: String },
+    foundDate: { type: Date },
     coordinates: { type: coordinatesSchema, default: null },
 }, { _id: false });
 

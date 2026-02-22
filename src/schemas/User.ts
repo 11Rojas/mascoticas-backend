@@ -32,6 +32,7 @@ const preferencesSchema = new Schema({
 
 const userSchema = new Schema<UserDocument>({
     name: { type: String, required: true },
+    username: { type: String, unique: true, sparse: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: false, select: false },
     phone: { type: String, required: false },
@@ -61,7 +62,7 @@ const userSchema = new Schema<UserDocument>({
     },
     paymentMethods: { type: [paymentMethodSchema], default: [] },
     preferences: { type: preferencesSchema, default: () => ({}) },
-    pushSubscriptions: { type: [Schema.Types.Mixed], default: [] },
+    pushSubscriptions: { type: Schema.Types.Mixed, default: [] },
     blockedUsers: [{ type: Schema.Types.ObjectId, ref: "User" }],
 }, {
     timestamps: true

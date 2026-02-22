@@ -60,6 +60,7 @@ export interface IUser {
         }
     };
     profile_picture: string;
+    username?: string;
     pets: Types.ObjectId[];
     is_verified: boolean;
     status: UserStatus;
@@ -68,6 +69,7 @@ export interface IUser {
     paymentMethods: IPaymentMethod[];
     preferences: IUserPreferences;
     pushSubscriptions: any[];
+    blockedUsers: Types.ObjectId[];
 }
 
 /** Mongoose Document for User */
