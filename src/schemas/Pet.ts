@@ -12,10 +12,17 @@ const matchPreferencesSchema = new Schema({
     },
 }, { _id: false });
 
+const coordinatesSchema = new Schema({
+    lat: { type: Number },
+    lng: { type: Number },
+    radius: { type: Number, default: 5 }
+}, { _id: false });
+
 const adoptionInfoSchema = new Schema({
     description: { type: String },
     contact: { type: String },
     location: { type: String },
+    coordinates: { type: coordinatesSchema, default: null },
 }, { _id: false });
 
 const lostInfoSchema = new Schema({
@@ -26,6 +33,7 @@ const lostInfoSchema = new Schema({
     contact: { type: String },
     description: { type: String },
     found: { type: Boolean, default: false },
+    coordinates: { type: coordinatesSchema, default: null },
 }, { _id: false });
 
 const petSchema = new Schema<PetDocument>({

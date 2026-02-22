@@ -461,6 +461,17 @@ userRouter.get('/pets-list/adoption', async (c) => {
 });
 
 // POST /reports - Create a report for a lost/adoption animal
+userRouter.get('/pets/:id/public', async (c) => {
+    try {
+        const petId = c.req.param('id');
+        const pet = await Pet.findById(petId).populate('owner_id', 'name phone profile_picture location');
+        if (!pet) return c.json({ error: 'Mascota no encontrada' }, 404);
+        return c.json({ success: true, pet });
+    } catch (error) {
+        return c.json({ error: 'Error al obtener los detalles de la mascota' }, 500);
+    }
+});
+
 userRouter.post('/reports', async (c) => {
     try {
         const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
