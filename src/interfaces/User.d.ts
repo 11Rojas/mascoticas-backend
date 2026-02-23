@@ -61,6 +61,7 @@ export interface IUser {
     };
     profile_picture: string;
     username?: string;
+    description?: string;
     pets: Types.ObjectId[];
     is_verified: boolean;
     status: UserStatus;

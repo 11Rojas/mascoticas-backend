@@ -44,6 +44,7 @@ const userSchema = new Schema<UserDocument>({
         }
     },
     profile_picture: { type: String, default: "" },
+    description: { type: String, default: "" },
     pets: [{ type: Schema.Types.ObjectId, ref: "Pet" }],
     is_verified: { type: Boolean, default: false },
     status: {

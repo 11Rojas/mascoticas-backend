@@ -140,6 +140,70 @@ userRouter.post('/pets', async (c) => {
     }
 });
 
+// PATCH /pets/:id - Update pet information
+userRouter.patch('/pets/:id', async (c) => {
+    try {
+        const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
+        if (!session) return c.json({ error: 'No autorizado' }, 401);
+
+        const petId = c.req.param('id');
+        const user = await User.findOne({ email: session.user.email });
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        const data = await c.req.json();
+
+        // Find and update if owner
+        const updatedPet = await Pet.findOneAndUpdate(
+            { _id: petId, owner_id: user._id },
+            { $set: data },
+            { new: true }
+        );
+
+        if (!updatedPet) return c.json({ error: 'Mascota no encontrada o no tienes permiso' }, 404);
+
+        return c.json({ success: true, pet: updatedPet });
+    } catch (error) {
+        console.error('Error updating pet:', error);
+        return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+});
+
+// DELETE /pets/:id - Remove a pet and its matches/chats
+userRouter.delete('/pets/:id', async (c) => {
+    try {
+        const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
+        if (!session) return c.json({ error: 'No autorizado' }, 401);
+
+        const petId = c.req.param('id');
+        const user = await User.findOne({ email: session.user.email });
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        const pet = await Pet.findOne({ _id: petId, owner_id: user._id });
+        if (!pet) return c.json({ error: 'Mascota no encontrada o no tienes permiso' }, 404);
+
+        // 1. Delete associated Matches and Chats
+        const matches = await Match.find({ $or: [{ pet_a: petId }, { pet_b: petId }] });
+        for (const match of matches) {
+            if (match.chat_id) {
+                await Message.deleteMany({ chat_id: match.chat_id });
+                await Chat.findByIdAndDelete(match.chat_id);
+            }
+            await Match.findByIdAndDelete(match._id);
+        }
+
+        // 2. Remove pet from User's pets array
+        await User.findByIdAndUpdate(user._id, { $pull: { pets: petId } });
+
+        // 3. Delete the pet
+        await Pet.findByIdAndDelete(petId);
+
+        return c.json({ success: true, message: 'Mascota eliminada correctamente' });
+    } catch (error) {
+        console.error('Error deleting pet:', error);
+        return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+});
+
 userRouter.get('/pets', async (c) => {
     try {
         const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });

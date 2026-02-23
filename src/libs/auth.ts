@@ -30,6 +30,7 @@ export const auth = betterAuth({
             badges: { type: "string[]", required: false },
             location: { type: "string", required: false },
             username: { type: "string", required: false },
+            description: { type: "string", required: false },
         }
     },
     databaseHooks: {
