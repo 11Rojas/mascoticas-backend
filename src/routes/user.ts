@@ -245,7 +245,7 @@ userRouter.get('/pets/:id/match-candidates', async (c) => {
         const whoLikedMeIds = await Swipe.find({ swiped_pet: activePetId, type: 'like' }).distinct('swiper_pet');
 
         // Fetch ALL other pets regardless of anything else
-        const candidates = await Pet.find(query).populate('owner_id', 'location');
+        const candidates = await Pet.find(query).populate('owner_id', 'location name username profile_picture');
         console.log(`DEBUG: Found ${candidates.length} potential pets from DB total`);
 
         const results = candidates.map(pet => {
@@ -601,7 +601,9 @@ userRouter.patch('/me', async (c) => {
         const fields: Record<string, any> = {};
         if (typeof body.phone === 'string') fields.phone = body.phone.trim();
         if (typeof body.name === 'string' && body.name.trim()) fields.name = body.name.trim();
+        if (typeof body.username === 'string' && body.username.trim()) fields.username = body.username.trim().toLowerCase();
         if (typeof body.profile_picture === 'string') fields.profile_picture = body.profile_picture.trim();
+        if (typeof body.description === 'string') fields.description = body.description.trim();
         if (!Object.keys(fields).length) return c.json({ error: 'Sin campos válidos' }, 400);
         const user = await User.findOneAndUpdate(
             { email: session.user.email },
@@ -813,10 +815,10 @@ userRouter.get('/chats', async (c) => {
                 path: 'match_id',
                 populate: {
                     path: 'pet_a pet_b',
-                    populate: { path: 'owner_id', select: '_id name profile_picture location' }
+                    populate: { path: 'owner_id', select: '_id name username profile_picture location' }
                 }
             })
-            .populate('participants', 'name profile_picture')
+            .populate('participants', 'name username profile_picture')
             .sort({ last_message_date: -1 });
 
         // Filter out chats with blocked users
@@ -968,6 +970,42 @@ userRouter.post('/chats/:id/delete', async (c) => {
     }
 });
 
+// POST /matches/:id/unmatch - Delete a match and its associated chat
+userRouter.post('/matches/:id/unmatch', async (c) => {
+    try {
+        const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
+        if (!session) return c.json({ error: 'No autorizado' }, 401);
+
+        const matchId = c.req.param('id');
+        const user = await User.findOne({ email: session.user.email });
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        const match = await Match.findById(matchId);
+        if (!match) return c.json({ error: 'Match no encontrado' }, 404);
+
+        // Check if user is owner of one of the pets in the match
+        const petA = await Pet.findById(match.pet_a);
+        const petB = await Pet.findById(match.pet_b);
+
+        if (petA?.owner_id.toString() !== user._id.toString() && petB?.owner_id.toString() !== user._id.toString()) {
+            return c.json({ error: 'No tienes permiso para deshacer este match' }, 403);
+        }
+
+        // Delete associated chat if exists
+        if (match.chat_id) {
+            await Chat.findByIdAndDelete(match.chat_id);
+            await Message.deleteMany({ chat_id: match.chat_id });
+        }
+
+        await Match.findByIdAndDelete(matchId);
+
+        return c.json({ success: true, message: 'Match eliminado correctamente' });
+    } catch (error) {
+        console.error('Error unmatching:', error);
+        return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+});
+
 // POST /users/:id/block - Block/Unblock a user
 userRouter.post('/users/:id/block', async (c) => {
     try {
@@ -998,7 +1036,7 @@ userRouter.get('/blocked-users', async (c) => {
         const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
         if (!session) return c.json({ error: 'No autorizado' }, 401);
 
-        const user = await User.findOne({ email: session.user.email }).populate('blockedUsers', 'name profile_picture');
+        const user = await User.findOne({ email: session.user.email }).populate('blockedUsers', 'name username profile_picture');
         if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
 
         return c.json({ success: true, blockedUsers: user.blockedUsers });
@@ -1038,6 +1076,22 @@ userRouter.post('/push-subscribe', async (c) => {
     } catch (error) {
         console.error('DEBUG: Error in push-subscribe:', error);
         return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+});
+
+// GET /users/:id/public - Get public user profile with pets
+userRouter.get('/users/:id/public', async (c) => {
+    try {
+        const userId = c.req.param('id');
+        const user = await User.findById(userId)
+            .select('name username profile_picture location description pets badges is_verified')
+            .populate('pets', 'name species race age images');
+
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        return c.json({ success: true, user });
+    } catch (error) {
+        return c.json({ error: 'Error al obtener el perfil' }, 500);
     }
 });
 
