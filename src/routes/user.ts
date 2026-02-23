@@ -748,7 +748,7 @@ userRouter.get('/matches', async (c) => {
                 { pet_b: { $in: user.pets } }
             ],
             status: MatchStatus.ACCEPTED
-        }).populate('pet_a pet_b');
+        }).populate('pet_a pet_b chat_id');
 
         return c.json({ success: true, matches });
     } catch (error) {

@@ -29,6 +29,32 @@ export const auth = betterAuth({
             status: { type: "string", defaultValue: "active" },
             badges: { type: "string[]", required: false },
             location: { type: "string", required: false },
+            username: { type: "string", required: false },
+        }
+    },
+    databaseHooks: {
+        user: {
+            create: {
+                before: async (user) => {
+                    let baseUsername = user.name.replace(/\s+/g, '').toLowerCase();
+                    let suffix = '';
+                    let tempUsername = baseUsername;
+                    let existingUser = await db.collection("users").findOne({ username: tempUsername });
+                    let attempts = 0;
+                    while (existingUser && attempts < 10) {
+                        suffix = Math.floor(Math.random() * 10000).toString();
+                        tempUsername = `${baseUsername}${suffix}`;
+                        existingUser = await db.collection("users").findOne({ username: tempUsername });
+                        attempts++;
+                    }
+                    return {
+                        data: {
+                            ...user,
+                            username: tempUsername
+                        }
+                    };
+                }
+            }
         }
     },
     socialProviders: {
