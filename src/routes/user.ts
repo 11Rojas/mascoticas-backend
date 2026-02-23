@@ -10,6 +10,8 @@ import { Notification } from '../schemas/Notification';
 import { NotificationType } from '../interfaces/Notifications.d';
 import { MatchStatus } from '../interfaces/Match.d';
 import * as webpush from 'web-push';
+import { Booking } from '../schemas/Booking';
+import { Vet } from '../schemas/Vet';
 import { broadcastToChat } from '../libs/ws';
 
 // Web Push Configuration
@@ -168,7 +170,7 @@ userRouter.patch('/pets/:id', async (c) => {
     }
 });
 
-// DELETE /pets/:id - Remove a pet and its matches/chats
+// DELETE /pets/:id - Remove a pet and its matches/chats/swipes
 userRouter.delete('/pets/:id', async (c) => {
     try {
         const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
@@ -178,29 +180,45 @@ userRouter.delete('/pets/:id', async (c) => {
         const user = await User.findOne({ email: session.user.email });
         if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
 
+        // Verify ownership
         const pet = await Pet.findOne({ _id: petId, owner_id: user._id });
         if (!pet) return c.json({ error: 'Mascota no encontrada o no tienes permiso' }, 404);
 
-        // 1. Delete associated Matches and Chats
+        console.log(`DEBUG: Deleting pet ${petId} and all associated data...`);
+
+        // 1. Delete associated Matches, Chats and Messages
         const matches = await Match.find({ $or: [{ pet_a: petId }, { pet_b: petId }] });
+        console.log(`DEBUG: Found ${matches.length} matches to delete`);
+
         for (const match of matches) {
             if (match.chat_id) {
-                await Message.deleteMany({ chat_id: match.chat_id });
-                await Chat.findByIdAndDelete(match.chat_id);
+                const msgDel = await Message.deleteMany({ chat_id: match.chat_id });
+                const chatDel = await Chat.findByIdAndDelete(match.chat_id);
+                console.log(`DEBUG: Deleted chat ${match.chat_id} and ${msgDel.deletedCount} messages`);
             }
             await Match.findByIdAndDelete(match._id);
         }
 
-        // 2. Remove pet from User's pets array
+        // 3. Delete all Swipes involving this pet (both as swiper or swiped)
+        const swipeDel = await Swipe.deleteMany({ $or: [{ swiper_pet: petId }, { swiped_pet: petId }] });
+        console.log(`DEBUG: Deleted ${swipeDel.deletedCount} swipes`);
+
+        // 4. Delete associated Bookings
+        const bookingDel = await Booking.deleteMany({ pet_id: petId });
+        console.log(`DEBUG: Deleted ${bookingDel.deletedCount} bookings`);
+
+        // 5. Remove pet from User's pets array
         await User.findByIdAndUpdate(user._id, { $pull: { pets: petId } });
 
-        // 3. Delete the pet
+        // 6. Delete the pet itself
         await Pet.findByIdAndDelete(petId);
 
-        return c.json({ success: true, message: 'Mascota eliminada correctamente' });
-    } catch (error) {
+        console.log(`DEBUG: Pet ${petId} deleted successfully`);
+
+        return c.json({ success: true, message: 'Mascota y todos sus datos asociados fueron eliminados correctamente' });
+    } catch (error: any) {
         console.error('Error deleting pet:', error);
-        return c.json({ error: 'Error interno del servidor' }, 500);
+        return c.json({ error: 'Error interno del servidor', details: error.message }, 500);
     }
 });
 
@@ -642,6 +660,45 @@ userRouter.patch('/pets/:id/found', async (c) => {
     }
 });
 
+
+// POST /vets - Register a new veterinary (pending approval)
+userRouter.post('/vets', async (c) => {
+    try {
+        const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
+        if (!session) return c.json({ error: 'No autorizado' }, 401);
+
+        const user = await User.findOne({ email: session.user.email });
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        const data = await c.req.json();
+
+        // Basic validation
+        if (!data.name || !data.email || !data.phone || !data.location?.address) {
+            return c.json({ error: 'Faltan campos obligatorios' }, 400);
+        }
+
+        const newVet = new Vet({
+            ...data,
+            owner_id: user._id, // Adding this for internal tracking if needed, though schema uses 'owner' string
+            owner: user.name,
+            is_verified: false // Always start as unverified (pending approval)
+        });
+
+        await newVet.save();
+
+        return c.json({
+            success: true,
+            message: 'Veterinaria registrada. Pendiente por aprobación.',
+            vet: newVet
+        });
+    } catch (error: any) {
+        if (error.code === 11000) {
+            return c.json({ error: 'El correo electrónico ya está registrado para otra veterinaria' }, 400);
+        }
+        console.error('Error registering vet:', error);
+        return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+});
 
 // ── GET /me ──────────────────────────────────────────────────────
 userRouter.get('/me', async (c) => {
