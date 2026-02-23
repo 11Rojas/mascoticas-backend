@@ -813,7 +813,7 @@ userRouter.get('/chats', async (c) => {
                 path: 'match_id',
                 populate: {
                     path: 'pet_a pet_b',
-                    populate: { path: 'owner_id', select: '_id name' }
+                    populate: { path: 'owner_id', select: '_id name profile_picture location' }
                 }
             })
             .populate('participants', 'name profile_picture')
