@@ -45,6 +45,7 @@ const userSchema = new Schema<UserDocument>({
     },
     profile_picture: { type: String, default: "" },
     description: { type: String, default: "" },
+    role: { type: String, enum: ['admin', 'user'], default: 'user' },
     pets: [{ type: Schema.Types.ObjectId, ref: "Pet" }],
     is_verified: { type: Boolean, default: false },
     status: {

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { Hono } from 'hono'
 import authRouter from './routes/auth/auth';
 import userRouter from './routes/user';
+import { adminRouter } from './routes/admin';
 import mongoose from 'mongoose';
 import { cors } from 'hono/cors';
 import { createBunWebSocket } from 'hono/bun'
@@ -93,6 +94,7 @@ app.get('/ws', upgradeWebSocket((c) => {
 
 app.route('/api', authRouter);
 app.route('/api/user', userRouter);
+app.route('/api/admin', adminRouter);
 
 // Capture server instance from fetch
 const mainFetch = (req: Request, server: any) => {

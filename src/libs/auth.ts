@@ -31,6 +31,7 @@ export const auth = betterAuth({
             location: { type: "string", required: false },
             username: { type: "string", required: false },
             description: { type: "string", required: false },
+            role: { type: "string", defaultValue: "user" },
         }
     },
     databaseHooks: {
@@ -57,6 +58,9 @@ export const auth = betterAuth({
                 }
             }
         }
+    },
+    emailAndPassword: {
+        enabled: true,
     },
     socialProviders: {
         google: {
