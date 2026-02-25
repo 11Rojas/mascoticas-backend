@@ -669,6 +669,26 @@ userRouter.patch('/pets/:id/found', async (c) => {
                     updateDoc.matchMode = false;
                     updateDoc.in_adoption = false;
                     updateDoc.is_lost = false;
+
+                    // Clean up: delete matches, chats and messages related to this pet
+                    const petMatches = await Match.find({
+                        $or: [{ pet_a: id }, { pet_b: id }]
+                    });
+
+                    const matchIds = petMatches.map(m => m._id);
+                    const chatIds = petMatches.map(m => m.chat_id).filter(Boolean);
+
+                    if (chatIds.length > 0) {
+                        await Message.deleteMany({ chat_id: { $in: chatIds } });
+                        await Chat.deleteMany({ _id: { $in: chatIds } });
+                    }
+
+                    if (matchIds.length > 0) {
+                        await Match.deleteMany({ _id: { $in: matchIds } });
+                    }
+
+                    // Also delete swipes to start fresh
+                    await Swipe.deleteMany({ $or: [{ fromPetId: id }, { targetPetId: id }] });
                 }
             }
         }
