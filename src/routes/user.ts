@@ -12,6 +12,7 @@ import { MatchStatus } from '../interfaces/Match.d';
 import * as webpush from 'web-push';
 import { Booking } from '../schemas/Booking';
 import { Vet } from '../schemas/Vet';
+import { Report } from '../schemas/Report';
 import { broadcastToChat } from '../libs/ws';
 
 // Web Push Configuration
@@ -85,6 +86,29 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
 }
 
 const userRouter = new Hono();
+
+userRouter.post('/report', async (c) => {
+    try {
+        const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
+        if (!session) return c.json({ error: 'No autorizado' }, 401);
+
+        const { reportedId, context, reason, details } = await c.req.json();
+
+        const reporterId = (session.user as any).id;
+        const newReport = await Report.create({
+            reporterId,
+            reportedId,
+            context,
+            reason,
+            details
+        });
+
+        return c.json({ success: true, report: newReport });
+    } catch (error) {
+        console.error("Error creating report:", error);
+        return c.json({ error: 'Error del servidor' }, 500);
+    }
+});
 
 userRouter.post('/update-location', async (c) => {
     try {

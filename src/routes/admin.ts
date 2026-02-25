@@ -4,6 +4,7 @@ import { User } from "../schemas/User";
 import { Pet } from "../schemas/Pet";
 import { Match } from "../schemas/Match";
 import { Vet } from "../schemas/Vet";
+import { Report } from "../schemas/Report";
 
 export const adminRouter = new Hono();
 
@@ -22,12 +23,13 @@ adminRouter.use("/*", async (c, next) => {
 
 adminRouter.get("/stats", async (c) => {
     try {
-        const [totalUsers, totalPets, totalMatches, totalVets, pendingVets] = await Promise.all([
+        const [totalUsers, totalPets, totalMatches, totalVets, pendingVets, pendingReports] = await Promise.all([
             User.countDocuments(),
             Pet.countDocuments(),
             Match.countDocuments(),
             Vet.countDocuments(),
             Vet.countDocuments({ is_verified: false }),
+            Report.countDocuments({ status: 'pending' })
         ]);
 
         return c.json({
@@ -37,7 +39,8 @@ adminRouter.get("/stats", async (c) => {
                 totalPets,
                 totalMatches,
                 totalVets,
-                pendingVets
+                pendingVets,
+                pendingReports
             }
         });
     } catch (error) {
@@ -153,6 +156,31 @@ adminRouter.get("/logs", async (c) => {
     } catch (error) {
         console.error("Error fetching admin logs:", error);
         return c.json({ error: "Error fetching logs" }, 500);
+    }
+});
+
+adminRouter.get("/reports", async (c) => {
+    try {
+        const reports = await Report.find().sort({ createdAt: -1 }).populate('reporterId', 'name email');
+        return c.json({ success: true, reports });
+    } catch (error) {
+        console.error("Error fetching admin reports:", error);
+        return c.json({ error: "Error interno del servidor" }, 500);
+    }
+});
+
+adminRouter.patch("/reports/:id/resolve", async (c) => {
+    try {
+        const reportId = c.req.param("id");
+        const { status } = await c.req.json();
+
+        const report = await Report.findByIdAndUpdate(reportId, { status }, { new: true });
+        if (!report) return c.json({ error: "Reporte no encontrado" }, 404);
+
+        return c.json({ success: true, report });
+    } catch (error) {
+        console.error("Error resolving report:", error);
+        return c.json({ error: "Error interno" }, 500);
     }
 });
 
