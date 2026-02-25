@@ -622,7 +622,7 @@ userRouter.patch('/pets/:id/found', async (c) => {
         if (!session) return c.json({ error: 'No autorizado' }, 401);
 
         const { id } = c.req.param();
-        const { foundBy, resolutionDetails } = await c.req.json();
+        const { foundBy, resolutionDetails, type, adopterId, transfer } = await c.req.json();
 
         // Check if pet belongs to session user
         const user = await User.findOne({ email: session.user.email });
@@ -641,7 +641,7 @@ userRouter.patch('/pets/:id/found', async (c) => {
             in_adoption: false,
         };
 
-        if (pet.lostInfo) {
+        if (type === 'found' || pet.is_lost) {
             updateDoc.lostInfo = {
                 ...pet.lostInfo,
                 found: true,
@@ -651,12 +651,34 @@ userRouter.patch('/pets/:id/found', async (c) => {
             };
         }
 
+        if (type === 'adopted' || pet.in_adoption) {
+            updateDoc.adoptionInfo = {
+                ...pet.adoptionInfo,
+                adopted: true,
+                adoptedBy: foundBy,
+                resolutionDetails,
+                adoptedDate: new Date()
+            };
+
+            // Handle internal transfer if requested
+            if (transfer && adopterId) {
+                const adopter = await User.findById(adopterId);
+                if (adopter) {
+                    updateDoc.owner_id = adopter._id;
+                    // When transferring, we should also reset other modes for the new owner
+                    updateDoc.matchMode = false;
+                    updateDoc.in_adoption = false;
+                    updateDoc.is_lost = false;
+                }
+            }
+        }
+
         const updatedPet = await Pet.findByIdAndUpdate(id, { $set: updateDoc }, { new: true });
 
         return c.json({ success: true, pet: updatedPet });
     } catch (error) {
-        console.error('Error reporting found pet:', error);
-        return c.json({ error: 'Error al reportar mascota encontrada' }, 500);
+        console.error('Error reporting found/adopted pet:', error);
+        return c.json({ error: 'Error al procesar resolución de mascota' }, 500);
     }
 });
 

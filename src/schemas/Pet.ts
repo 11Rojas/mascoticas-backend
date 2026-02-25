@@ -23,6 +23,10 @@ const adoptionInfoSchema = new Schema({
     contact: { type: String },
     location: { type: String },
     coordinates: { type: coordinatesSchema, default: null },
+    adopted: { type: Boolean, default: false },
+    adoptedBy: { type: Schema.Types.Mixed, default: null },
+    resolutionDetails: { type: String },
+    adoptedDate: { type: Date },
 }, { _id: false });
 
 const lostInfoSchema = new Schema({
