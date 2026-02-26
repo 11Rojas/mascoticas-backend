@@ -961,7 +961,9 @@ userRouter.get('/matches/pending', async (c) => {
         const receivedLikes = await Swipe.find({
             swiped_pet: { $in: myPetIds },
             type: 'like'
-        }).populate({ path: 'swiper_pet', select: 'name images owner_id race species' });
+        })
+            .populate({ path: 'swiper_pet', select: 'name images owner_id race species age' })
+            .populate({ path: 'swiped_pet', select: 'name images owner_id race species age' });
 
         // IDs de mascotas que yo ya swipeé (en cualquier dirección)
         const mySwipedIds = await Swipe.find({
@@ -975,7 +977,7 @@ userRouter.get('/matches/pending', async (c) => {
         const result = pending.map(s => ({
             swipeId: s._id,
             fromPet: s.swiper_pet,
-            toPetId: s.swiped_pet
+            toPet: s.swiped_pet
         }));
 
         return c.json({ success: true, matches: result });
