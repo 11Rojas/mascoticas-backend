@@ -1043,19 +1043,27 @@ userRouter.post('/chats/:id/messages', async (c) => {
         if (!session) return c.json({ error: 'No autorizado' }, 401);
 
         const chatId = c.req.param('id');
-        const { content } = await c.req.json();
+        const { content, images } = await c.req.json();
         const user = await User.findOne({ email: session.user.email });
+
+        if (images && images.length > 0) {
+            if (user?.plan === 'free' && images.length > 3) {
+                return c.json({ error: 'Los usuarios free solo pueden enviar hasta 3 imágenes a la vez.' }, 403);
+            }
+        }
 
         const newMessage = new Message({
             chat_id: chatId,
             sender_id: user?._id,
-            content
+            content: content || "",
+            images: images || []
         });
         await newMessage.save();
 
         // Update chat's last message
+        const isImageOnly = (!content || content.trim() === '') && (images && images.length > 0);
         const chat = await Chat.findByIdAndUpdate(chatId, {
-            last_message: content,
+            last_message: isImageOnly ? '📷 Imagen' : content,
             last_message_date: new Date(),
             $push: { messages: newMessage._id },
             read_by: [user?._id] // Only sender has read it now
@@ -1069,7 +1077,7 @@ userRouter.post('/chats/:id/messages', async (c) => {
                 sendPush(
                     recipientId,
                     `Mensaje de ${user?.name || 'Mascoticas'}`,
-                    content.length > 50 ? content.substring(0, 47) + '...' : content,
+                    isImageOnly ? '📷 Imagen' : (content.length > 50 ? content.substring(0, 47) + '...' : content),
                     `/dashboard`,
                     chatId
                 );

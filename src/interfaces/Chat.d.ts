@@ -19,6 +19,7 @@ export interface IMessage {
     chat_id: Types.ObjectId;
     sender_id: Types.ObjectId;
     content: string;
+    images?: string[];
     timestamp: Date;
 }
 
