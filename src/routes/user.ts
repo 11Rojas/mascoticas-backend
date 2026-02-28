@@ -931,7 +931,7 @@ userRouter.get('/matches', async (c) => {
         const user = await User.findOne({ email: session.user.email });
         if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
 
-        const matches = await Match.find({
+        const matchesDocs = await Match.find({
             $or: [
                 { pet_a: { $in: user.pets } },
                 { pet_b: { $in: user.pets } }
@@ -939,7 +939,19 @@ userRouter.get('/matches', async (c) => {
             status: MatchStatus.ACCEPTED
         }).populate('pet_a pet_b chat_id');
 
-        return c.json({ success: true, matches });
+        const activeMatches = matchesDocs.filter(m => {
+            const petA = m.pet_a as any;
+            const petB = m.pet_b as any;
+            if (!petA || !petB) return false;
+
+            const isMePetA = user.pets.some(id => id.toString() === petA._id?.toString());
+            const otherPetOwnerId = isMePetA ? petB.owner_id : petA.owner_id;
+
+            // If I blocked them, hide the match
+            return !user.blockedUsers.some(id => id.toString() === otherPetOwnerId?.toString());
+        });
+
+        return c.json({ success: true, matches: activeMatches });
     } catch (error) {
         return c.json({ error: 'Error interno del servidor' }, 500);
     }
@@ -1007,14 +1019,31 @@ userRouter.get('/chats', async (c) => {
                     populate: { path: 'owner_id', select: '_id name username profile_picture location' }
                 }
             })
-            .populate('participants', 'name username profile_picture')
+            .populate('participants', 'name username profile_picture blockedUsers')
             .sort({ last_message_date: -1 });
 
-        // Filter out chats with blocked users
-        const activeChats = chats.filter(chat => {
-            const otherParticipant = chat.participants.find(p => p._id.toString() !== user._id.toString());
-            return !user.blockedUsers.includes(otherParticipant?._id);
-        });
+        // Filter out chats with blocked users and inject flag
+        const activeChats = chats.map(chatDoc => {
+            const chatObj = chatDoc.toObject();
+            const otherParticipant = chatObj.participants.find((p: any) => p._id.toString() !== user._id.toString());
+
+            // If I blocked them, completely hide chat
+            if (user.blockedUsers.some(id => id.toString() === otherParticipant?._id?.toString())) {
+                return null;
+            }
+
+            // If they blocked me, mark it
+            if (otherParticipant?.blockedUsers?.some((id: any) => id.toString() === user._id.toString())) {
+                chatObj.is_blocked_by_them = true;
+            } else {
+                chatObj.is_blocked_by_them = false;
+            }
+
+            // Remove blockedUsers payload so client doesn't see it
+            chatObj.participants.forEach((p: any) => delete p.blockedUsers);
+
+            return chatObj;
+        }).filter(Boolean);
 
         return c.json({ success: true, chats: activeChats });
     } catch (error) {
@@ -1100,6 +1129,17 @@ userRouter.post('/chats/:id/messages', async (c) => {
         const chatId = c.req.param('id');
         const { content, images } = await c.req.json();
         const user = await User.findOne({ email: session.user.email });
+
+        // Check blocking
+        const chatCheck = await Chat.findById(chatId);
+        if (!chatCheck) return c.json({ error: 'Chat no encontrado' }, 404);
+
+        const otherParticipantId = chatCheck.participants.find(p => p.toString() !== user?._id.toString());
+        const otherParticipant = await User.findById(otherParticipantId);
+
+        if (otherParticipant?.blockedUsers?.some(id => id.toString() === user?._id.toString())) {
+            return c.json({ error: 'No puedes responder a esta conversación' }, 403);
+        }
 
         if (images && images.length > 0) {
             if (user?.plan === 'free' && images.length > 3) {
