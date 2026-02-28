@@ -6,7 +6,9 @@ const messageSchema = new Schema<MessageDocument>({
     sender_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
     content: { type: String, required: false, default: "" },
     images: { type: [String], default: [] },
-    timestamp: { type: Date, default: Date.now }
+    timestamp: { type: Date, default: Date.now },
+    deleted_by: { type: [Schema.Types.ObjectId], ref: "User", default: [] },
+    deleted_for_everyone: { type: Boolean, default: false }
 }, {
     timestamps: true
 });

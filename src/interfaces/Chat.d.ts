@@ -21,6 +21,8 @@ export interface IMessage {
     content: string;
     images?: string[];
     timestamp: Date;
+    deleted_by?: Types.ObjectId[];
+    deleted_for_everyone?: boolean;
 }
 
 export interface MessageDocument extends IMessage, Document {

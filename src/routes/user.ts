@@ -1030,9 +1030,62 @@ userRouter.get('/chats/:id/messages', async (c) => {
         if (!session) return c.json({ error: 'No autorizado' }, 401);
 
         const chatId = c.req.param('id');
-        const messages = await Message.find({ chat_id: chatId }).sort({ createdAt: 1 });
+        const user = await User.findOne({ email: session.user.email });
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        const messages = await Message.find({
+            chat_id: chatId,
+            deleted_by: { $ne: user._id }
+        }).sort({ createdAt: 1 });
 
         return c.json({ success: true, messages });
+    } catch (error) {
+        return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+});
+
+// POST /messages/:id/delete - Delete a message (for me or everyone)
+userRouter.post('/messages/:id/delete', async (c) => {
+    try {
+        const session = await auth.api.getSession({ query: c.req.query(), headers: c.req.raw.headers });
+        if (!session) return c.json({ error: 'No autorizado' }, 401);
+
+        const msgId = c.req.param('id');
+        const { type } = await c.req.json(); // "me" or "everyone"
+
+        const user = await User.findOne({ email: session.user.email });
+        if (!user) return c.json({ error: 'Usuario no encontrado' }, 404);
+
+        const message = await Message.findById(msgId);
+        if (!message) return c.json({ error: 'Mensaje no encontrado' }, 404);
+
+        if (type === 'everyone') {
+            if (message.sender_id.toString() !== user._id.toString()) {
+                return c.json({ error: 'No tienes permiso para eliminar este mensaje para todos' }, 403);
+            }
+            message.deleted_for_everyone = true;
+            message.content = "Este mensaje fue eliminado";
+            message.images = [];
+            await message.save();
+
+            // Notify via websockets
+            broadcastToChat(message.chat_id.toString(), {
+                type: 'message_deleted',
+                chatId: message.chat_id.toString(),
+                messageId: message._id.toString(),
+                deletedForEveryone: true,
+                newContent: message.content,
+                newImages: message.images
+            });
+        } else {
+            // "me"
+            if (!message.deleted_by.some(id => id.toString() === user._id.toString())) {
+                message.deleted_by.push(user._id as any);
+                await message.save();
+            }
+        }
+
+        return c.json({ success: true });
     } catch (error) {
         return c.json({ error: 'Error interno del servidor' }, 500);
     }
