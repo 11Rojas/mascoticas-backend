@@ -19,12 +19,6 @@ export const auth = betterAuth({
     }),
     secret: process.env.BETTER_AUTH_SECRET,
     baseURL: ensureProtocol(process.env.BETTER_AUTH_URL, 'http://localhost:3001'),
-    advanced: {
-        crossSubDomainCookies: {
-            enabled: true
-        },
-        defaultRedirectURL: process.env.ALLOWED_ORIGIN || 'https://mascoticas.app'
-    },
     user: {
         fields: {
             image: "profile_picture",
