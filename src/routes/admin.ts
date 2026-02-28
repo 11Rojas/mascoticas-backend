@@ -5,6 +5,7 @@ import { Pet } from "../schemas/Pet";
 import { Match } from "../schemas/Match";
 import { Vet } from "../schemas/Vet";
 import { Report } from "../schemas/Report";
+import { Swipe } from "../schemas/Swipe";
 
 export const adminRouter = new Hono();
 
@@ -23,13 +24,28 @@ adminRouter.use("/*", async (c, next) => {
 
 adminRouter.get("/stats", async (c) => {
     try {
-        const [totalUsers, totalPets, totalMatches, totalVets, pendingVets, pendingReports] = await Promise.all([
+        const [
+            totalUsers,
+            totalPets,
+            totalMatches,
+            totalVets,
+            pendingVets,
+            pendingReports,
+            petsInAdoption,
+            petsLost,
+            totalSwipes,
+            activeMatches
+        ] = await Promise.all([
             User.countDocuments(),
             Pet.countDocuments(),
             Match.countDocuments(),
             Vet.countDocuments(),
             Vet.countDocuments({ is_verified: false }),
-            Report.countDocuments({ status: 'pending' })
+            Report.countDocuments({ status: 'pending' }),
+            Pet.countDocuments({ in_adoption: true }),
+            Pet.countDocuments({ is_lost: true }),
+            Swipe.countDocuments(),
+            Match.countDocuments({ status: 'accepted' })
         ]);
 
         return c.json({
@@ -40,7 +56,11 @@ adminRouter.get("/stats", async (c) => {
                 totalMatches,
                 totalVets,
                 pendingVets,
-                pendingReports
+                pendingReports,
+                petsInAdoption,
+                petsLost,
+                totalSwipes,
+                activeMatches
             }
         });
     } catch (error) {
